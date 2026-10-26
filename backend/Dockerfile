@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 WORKDIR /app
 COPY --from=build /build/target/*.jar app.jar
 USER app
-EXPOSE 8020
+EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=3s --start-period=30s --retries=5 \
   CMD curl -fsS http://localhost:8080/actuator/health || exit 1
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
