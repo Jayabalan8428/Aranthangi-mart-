@@ -1,0 +1,214 @@
+<header class="topbar">
+  <a class="brand" href="#"><span class="brand-mark">A</span> {{ store.name }}</a>
+  <div class="search">
+    <input [(ngModel)]="searchText" (ngModelChange)="loadProducts()" (keyup.enter)="loadProducts()"
+           placeholder="Search rice, dal, milk, vegetables..." aria-label="Search products">
+    @if (searchText) {
+      <button class="search-clear" (click)="clearSearch()" aria-label="Clear search">✕</button>
+    }
+  </div>
+  <button class="ghost-button" (click)="openOrders()">📦 My orders</button>
+  <button class="cart-button" (click)="cartOpen = true">🛒 Cart <b>{{ cartCount }}</b></button>
+</header>
+
+<section class="hero">
+  <div>
+    <p class="eyebrow">வணக்கம்! WELCOME TO {{ store.name.toUpperCase() }}</p>
+    <h1>Fresh from the town.<br><span>Straight to your door.</span></h1>
+    <p class="hero-copy">{{ store.tagline }}.</p>
+    <button class="hero-button" (click)="scrollToProducts()">Start shopping ↓</button>
+  </div>
+  <div class="hero-art" aria-hidden="true">
+    <div class="orb orb-one"></div><div class="orb orb-two"></div>
+    <div class="hero-card">
+      <span>FREE DELIVERY</span>
+      <strong>On orders above {{ store.freeDeliveryAbove | currency:'INR':'symbol':'1.0-0' }}</strong>
+      <div class="hero-emoji">🍚 🍅 🥛 ☕</div>
+    </div>
+  </div>
+</section>
+
+<main id="products" class="layout">
+  <aside class="filters">
+    <h3>Categories</h3>
+    @for (cat of categories; track cat) {
+      <button [class.selected]="category === cat" (click)="selectCategory(cat)">{{ cat }}</button>
+    }
+    <div class="safe-note">
+      <span>✓</span>
+      <div><b>Demo store</b><small>Orders are simulated. No real payment is collected.</small></div>
+    </div>
+  </aside>
+
+  <section class="catalog">
+    <div class="section-heading">
+      <div>
+        <p class="eyebrow">{{ category === 'All' ? 'EVERYDAY ESSENTIALS' : category.toUpperCase() }}</p>
+        <h2>{{ searchText ? 'Results for "' + searchText + '"' : 'Shop products' }}</h2>
+      </div>
+      <div class="heading-tools">
+        <span class="result-count">{{ products.length }} items</span>
+        <select [(ngModel)]="sort" (ngModelChange)="loadProducts()" aria-label="Sort products">
+          <option value="default">Sort: Featured</option>
+          <option value="priceAsc">Price: Low to High</option>
+          <option value="priceDesc">Price: High to Low</option>
+          <option value="name">Name: A to Z</option>
+        </select>
+      </div>
+    </div>
+
+    @if (loading && products.length === 0) { <div class="notice">Loading products…</div> }
+    @if (error) { <div class="notice error">{{ error }}</div> }
+    @if (!loading && !error && products.length === 0) {
+      <div class="notice">No products found. Try another search or category.</div>
+    }
+
+    <div class="product-grid" [class.is-loading]="loading">
+      @for (product of products; track product.id) {
+        <article class="product-card" [class.sold-out]="product.stock === 0">
+          <div class="product-image">
+            <span class="emoji" aria-hidden="true">{{ product.emoji }}</span>
+            <span class="tag">{{ product.category }}</span>
+            @if (stockLabel(product); as label) {
+              <span class="stock-flag" [class.out]="product.stock === 0">{{ label }}</span>
+            }
+          </div>
+          <div class="product-info">
+            <h3>{{ product.name }}</h3>
+            <small class="unit">{{ product.unit }}</small>
+            <p>{{ product.description }}</p>
+            <div class="card-bottom">
+              <strong>{{ product.price | currency:'INR':'symbol':'1.0-0' }}</strong>
+              @if (qtyInCart(product) > 0) {
+                <div class="qty card-qty">
+                  <button (click)="changeQty(cart[cartIndex(product)], -1)" aria-label="Decrease quantity">−</button>
+                  <span>{{ qtyInCart(product) }}</span>
+                  <button (click)="addToCart(product)" [disabled]="qtyInCart(product) >= product.stock" aria-label="Increase quantity">+</button>
+                </div>
+              } @else {
+                <button class="add-button" [disabled]="product.stock === 0" (click)="addToCart(product)">
+                  {{ product.stock === 0 ? 'Sold out' : '+ Add' }}
+                </button>
+              }
+            </div>
+          </div>
+        </article>
+      }
+    </div>
+  </section>
+</main>
+
+@if (cartOpen || ordersOpen) {
+  <div class="overlay" (click)="cartOpen = false; ordersOpen = false"></div>
+}
+
+<aside class="cart-drawer" [class.open]="cartOpen" aria-label="Shopping cart">
+  <div class="drawer-head">
+    <div><p class="eyebrow">YOUR BAG</p><h2>Shopping cart</h2></div>
+    <button class="close" (click)="cartOpen = false" aria-label="Close cart">✕</button>
+  </div>
+
+  <div class="drawer-body">
+    @if (cart.length === 0 && !lastOrder) {
+      <p class="empty-cart">Your cart is empty. Add something fresh!</p>
+    }
+
+    @for (item of cart; track item.product.id) {
+      <div class="cart-line">
+        <div class="mini-image">{{ item.product.emoji }}</div>
+        <div class="line-info">
+          <b>{{ item.product.name }}</b>
+          <small>{{ item.product.unit }} · {{ item.product.price | currency:'INR':'symbol':'1.0-0' }}</small>
+          <div class="qty">
+            <button (click)="changeQty(item, -1)" aria-label="Decrease quantity">−</button>
+            <span>{{ item.quantity }}</span>
+            <button (click)="changeQty(item, 1)" [disabled]="item.quantity >= item.product.stock" aria-label="Increase quantity">+</button>
+            <button class="remove" (click)="remove(item)">Remove</button>
+          </div>
+        </div>
+        <strong class="line-total">{{ item.product.price * item.quantity | currency:'INR':'symbol':'1.0-0' }}</strong>
+      </div>
+    }
+
+    @if (cart.length) {
+      <div class="checkout">
+        @if (amountForFreeDelivery > 0) {
+          <div class="free-delivery">Add {{ amountForFreeDelivery | currency:'INR':'symbol':'1.0-0' }} more for free delivery 🚚</div>
+        } @else {
+          <div class="free-delivery ok">You've unlocked free delivery 🎉</div>
+        }
+
+        <label for="customerName">Your name</label>
+        <input id="customerName" [(ngModel)]="customerName" placeholder="Enter your name" autocomplete="name">
+
+        <label for="phone">Mobile number</label>
+        <input id="phone" [(ngModel)]="phone" placeholder="10-digit mobile number" inputmode="numeric" maxlength="10" autocomplete="tel">
+        @if (phone && !phoneValid) { <small class="field-error">Enter a valid 10-digit mobile number</small> }
+
+        <label for="address">Delivery address</label>
+        <textarea id="address" [(ngModel)]="address" rows="2" placeholder="House no, street, landmark, Aranthangi" autocomplete="street-address"></textarea>
+
+        <div class="totals">
+          <div><span>Subtotal</span><span>{{ cartSubtotal | currency:'INR':'symbol':'1.0-0' }}</span></div>
+          <div><span>Delivery</span><span>{{ deliveryFee === 0 ? 'FREE' : (deliveryFee | currency:'INR':'symbol':'1.0-0') }}</span></div>
+          <div class="grand"><span>Total</span><strong>{{ cartTotal | currency:'INR':'symbol':'1.0-0' }}</strong></div>
+        </div>
+
+        @if (orderError) { <div class="notice error compact">{{ orderError }}</div> }
+
+        <button class="checkout-button" [disabled]="!canCheckout" (click)="checkout()">
+          {{ placingOrder ? 'Placing order…' : 'Place demo order' }}
+        </button>
+        <small class="disclaimer">No payment is taken. This creates a sample order in the backend.</small>
+      </div>
+    }
+
+    @if (lastOrder) {
+      <div class="success-box">
+        <b>Order placed! 🎉 நன்றி!</b>
+        <span>Order #{{ lastOrder.id }} · {{ lastOrder.total | currency:'INR':'symbol':'1.0-0' }}</span>
+        <span>Delivering to {{ lastOrder.address }}</span>
+        <button (click)="lastOrder = null">Dismiss</button>
+      </div>
+    }
+  </div>
+</aside>
+
+<aside class="cart-drawer orders-drawer" [class.open]="ordersOpen" aria-label="My orders">
+  <div class="drawer-head">
+    <div><p class="eyebrow">TRACK</p><h2>My orders</h2></div>
+    <button class="close" (click)="ordersOpen = false" aria-label="Close orders">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div class="orders-lookup">
+      <label for="ordersPhone">Mobile number used for the order</label>
+      <div class="inline-form">
+        <input id="ordersPhone" [(ngModel)]="ordersPhone" (keyup.enter)="loadOrders()" inputmode="numeric" maxlength="10" placeholder="10-digit mobile number">
+        <button (click)="loadOrders()" [disabled]="ordersLoading">{{ ordersLoading ? '…' : 'Find' }}</button>
+      </div>
+      @if (ordersError) { <small class="field-error">{{ ordersError }}</small> }
+    </div>
+
+    @if (myOrders && myOrders.length === 0) { <p class="empty-cart">No orders found for this number.</p> }
+    @for (order of myOrders ?? []; track order.id) {
+      <div class="order-card">
+        <div class="order-head">
+          <b>Order #{{ order.id }}</b>
+          <span class="status" [attr.data-status]="order.status">{{ statusLabel(order.status) }}</span>
+        </div>
+        <small>{{ order.createdAt | date:'medium' }}</small>
+        <ul>
+          @for (line of order.items; track line.productId) {
+            <li>{{ line.quantity }} × {{ line.productName }}</li>
+          }
+        </ul>
+        <div class="order-total"><span>Total</span><strong>{{ order.total | currency:'INR':'symbol':'1.0-0' }}</strong></div>
+      </div>
+    }
+  </div>
+</aside>
+
+<footer>
+  <span class="brand"><span class="brand-mark">A</span> {{ store.name }}</span>
+  <span>Made in Aranthangi with Angular + Spring Boot + Docker.</span>
+</footer>
